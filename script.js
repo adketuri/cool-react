@@ -5,9 +5,9 @@ function createElement(type, props, ...children) {
     type,
     props: {
       ...props,
-      children: children.map((c) =>
-        typeof c === "object" ? c : createTextElement(c)
-      ),
+      children: children
+        .flat()
+        .map((c) => (typeof c === "object" ? c : createTextElement(c))),
     },
   };
 }
@@ -163,7 +163,12 @@ function performUnitOfWork(fiber) {
   }
 }
 
+let wipFiber = null;
+let hookIndex = null;
 function updateFunctionComponent(fiber) {
+  wipFiber = fiber;
+  hookIndex = 0;
+  wipFiber.hooks = [];
   // for FC, we actually run the function to get the children
   const children = [fiber.type(fiber.props)];
   reconcileChildren(fiber, children);
@@ -233,14 +238,56 @@ function reconcileChildren(wipFiber, elements) {
   }
 }
 
+function useState(initial) {
+  const oldHook =
+    wipFiber.alternate &&
+    wipFiber.alternate.hooks &&
+    wipFiber.alternate.hooks[hookIndex];
+  const hook = {
+    state: oldHook ? oldHook.state : initial,
+    queue: [],
+  };
+
+  const actions = oldHook ? oldHook.queue : [];
+  actions.forEach((action) => {
+    hook.state = action(hook.state);
+  });
+
+  const setState = (action) => {
+    hook.queue.push(action);
+    wipRoot = {
+      dom: currentRoot.dom,
+      props: currentRoot.props,
+      alternate: currentRoot,
+    };
+    nextUnitOfWork = wipRoot;
+    deletions = [];
+  };
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+  return [hook.state, setState];
+}
+
 const CoolReact = {
   createElement,
   render,
+  useState,
 };
 
 /** Example function component */
 function NameTag(props) {
   return <h1>Hi {props.name}</h1>;
+}
+
+function Counter(props) {
+  const [state, setState] = CoolReact.useState(props.initial);
+  const emoji = new Array(state).fill("🔥");
+  return (
+    <div>
+      <button onClick={() => setState((c) => c + 1)}>{state} Clicks</button>
+      <p>{emoji}</p>
+    </div>
+  );
 }
 
 /* @jsx CoolReact.createElement */
@@ -250,6 +297,7 @@ const element = (
     <p id="p">I get to see my daddy on july 14th</p>
     <img src="public/cameron-poe.gif" />
     <NameTag name="cameron" />
+    <Counter initial={5} />
   </div>
 );
 
