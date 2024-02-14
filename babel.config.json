@@ -1,0 +1,11 @@
+{
+  "plugins": [
+    [
+      "@babel/plugin-transform-react-jsx-development",
+      {
+        "throwIfNamespace": false, // defaults to true
+        "runtime": "classic" // defaults to classic
+      }
+    ]
+  ]
+}

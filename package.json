@@ -1,0 +1,11 @@
+{
+  "devDependencies": {
+    "@babel/cli": "^7.23.9",
+    "@babel/core": "^7.23.9",
+    "@babel/plugin-transform-react-jsx-development": "^7.22.5",
+    "@babel/preset-env": "^7.23.9"
+  },
+  "scripts": {
+    "babel": "npx babel script.js --out-file script-out.js"
+  }
+}
