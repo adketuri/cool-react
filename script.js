@@ -32,17 +32,31 @@ function commitWork(fiber) {
     return;
   }
 
-  const domParent = fiber.parent.dom;
+  // crawl up the fiber tree until we find a fiber with  a dom node
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const domParent = domParentFiber.dom;
+
   if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
     domParent.appendChild(fiber.dom);
   } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   } else if (fiber.effectTag === "DELETION") {
-    domParent.removeChild(fiber.dom);
+    commitDeletion(fiber, domParent);
   }
 
   commitWork(fiber.child);
   commitWork(fiber.sibling);
+}
+
+function commitDeletion() {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom);
+  } else {
+    commitDeletion(fiber.child, domParent);
+  }
 }
 
 function commitRoot() {
@@ -134,12 +148,11 @@ function workLoop(deadline) {
 requestIdleCallback(workLoop);
 
 function performUnitOfWork(fiber) {
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+  if (fiber.type instanceof Function) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
   }
-
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
 
   // search for the next unit of work
   if (fiber.child) return fiber.child;
@@ -148,6 +161,19 @@ function performUnitOfWork(fiber) {
     if (nextFiber.sibling) return nextFiber.sibling;
     nextFiber = nextFiber.parent;
   }
+}
+
+function updateFunctionComponent(fiber) {
+  // for FC, we actually run the function to get the children
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+
+function updateHostComponent(fiber) {
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  reconcileChildren(fiber, fiber.props.children);
 }
 
 function reconcileChildren(wipFiber, elements) {
@@ -212,18 +238,18 @@ const CoolReact = {
   render,
 };
 
-// const element = CoolReact.createElement(
-//   "div",
-//   { id: "foo" },
-//   CoolReact.createElement("h1", { id: "inner-h1" }, "inner h1"),
-//   CoolReact.createElement("p", { id: "some-p" }, "imma p")
-// );
+/** Example function component */
+function NameTag(props) {
+  return <h1>Hi {props.name}</h1>;
+}
+
 /* @jsx CoolReact.createElement */
 const element = (
   <div id="foo">
     <h1>very important website</h1>
     <p id="p">I get to see my daddy on july 14th</p>
     <img src="public/cameron-poe.gif" />
+    <NameTag name="cameron" />
   </div>
 );
 
