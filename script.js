@@ -23,18 +23,34 @@ function createTextElement(text) {
 }
 
 let nextUnitOfWork = null;
+let pendingRoot = null;
+
+function commitWork() {
+  if (!fiber) return;
+  const domParent = fiber.parent.dom;
+  domParent.appendChild(fiber.dom);
+  commitWork(fiber.child);
+  commitRoot(fiber.sibling);
+}
+
+function commitRoot() {
+  commitWork(pendingRoot.child);
+  pendingRoot = null;
+}
 
 function render(element, container) {
-  nextUnitOfWork = {
+  pendingRoot = {
     dom: container,
     props: {
       children: [element],
     },
   };
+  nextUnitOfWork = pendingRoot;
 }
 
 function createDom(fiber) {
   // recursively render the fiber and its children
+  // a fiber is a unit of work; one fiber = one element
   const dom =
     fiber.type === "TEXT_ELEMENT"
       ? document.createTextNode("")
@@ -54,6 +70,12 @@ function workLoop(deadline) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
+
+  // if we've completed all the work, let's commit the whole fiber tree to the dom
+  if (!nextUnitOfWork && pendingRoot) {
+    commitRoot();
+  }
+
   requestIdleCallback(workLoop); // setTimeout-like, runs when main is idle
 }
 
